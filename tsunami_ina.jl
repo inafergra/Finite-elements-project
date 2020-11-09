@@ -17,12 +17,8 @@ sea    = CompScienceMeshes.read_gmsh_mesh(fn, physical="Sea", dimension=2)
 border_vertices = skeleton(border, 0)
 coast_vertices  = skeleton(coast, 0)
 sea_vertices    = skeleton(sea, 0)
-# The FEM as presented here solved the homogenous Dirichlet problem for the Laplace
-# equations. This means that we will not be associating basis functions with vertices
-# on either boundary. After filtering out these vertices we are left with only
-# interior vertices.
 
-#In the assignment the active vertices (i.e., the vertices with basis functions associated) only exclude the vertices in the coast line(\Gamma_{1}); border vertices do have basis functions attached
+#When solving the equation div(grad(u))-k^2*u=f the active vertices (i.e., the vertices with basis functions associated) only exclude the vertices in the coast line(\Gamma_{1}); border vertices do have basis functions attached
 
 interior_vertices = submesh(sea_vertices) do v 
     #v in border_vertices && return false
@@ -31,7 +27,7 @@ interior_vertices = submesh(sea_vertices) do v
 end
 
 """
-Creates the local to global map for FEM assembly.
+The function 'localtoglobal'creates the local to global map for FEM assembly.
 
     localtoglobal(active_vertices, domain) -> gl
 
@@ -57,6 +53,9 @@ function localtoglobal(active_vertices, domain)
     end
     return gl
 end
+
+#------------------------------------------------------------------------------------
+
 function elementmatrix(mesh, element, kconstant)
     v1 = mesh.vertices[element[1]]
     v2 = mesh.vertices[element[2]]
@@ -78,6 +77,7 @@ function elementmatrix(mesh, element, kconstant)
         2 1 1 
         1 2 1
         1 1 2]
+    return S
 end
 function assemblematrix(mesh, active_vertices, kconstant)
     n = length(active_vertices)
@@ -98,6 +98,8 @@ function assemblematrix(mesh, active_vertices, kconstant)
     return S
 end
 
+#------------------------------------------------------------------------------------
+
 function elementvector(f, mesh, element)
     v1 = mesh.vertices[element[1]]
     v2 = mesh.vertices[element[2]]
@@ -109,6 +111,8 @@ function elementvector(f, mesh, element)
         f(v3)/3]
     return F
 end
+
+
 function assemblevector(f, mesh, active_vertices)
     n = length(active_vertices)
     F = zeros(ComplexF64,n)
@@ -124,18 +128,10 @@ function assemblevector(f, mesh, active_vertices)
     return F
 end
 
-# For the assignment of the lab, i.e. the Helmholtz equations (aka the frequency
-# domain wave equation), subject to absorbing boundary conditions, you will also
-# have to include a term stemming from boundary integral contributions. For that
-# term a different local-to-global matrix is required: one linking segments on the
-# boundary to indices of active vertices. You can create this map using the same
-# function, i.e. like:
-#
-#   gl = localtoglobal(active_vertices, border)
-#
 
-#we're solving the equation div(grad(u))-k^2 u = f
-#matrix boundary element integral (Sij), a 2x2 matrix
+#------------------------------------------------------------------------------------
+#2x2 matrix boundary element integral (S_bound)
+
 function boundaryelementmatrix(mesh, element, kconstant) #defined in \Gamma_{2}=edge of the world #mesh should be border vertices
     v1 = mesh.vertices[element[1]]
     v2 = mesh.vertices[element[2]]
@@ -146,6 +142,8 @@ function boundaryelementmatrix(mesh, element, kconstant) #defined in \Gamma_{2}=
         1 1 2]
     return S
 end
+
+
 function assembleboundarymatrix(mesh, active_vertices, kconstant)  
     n = length(active_vertices)
     S = zeros(ComplexF64,n,n)
@@ -165,30 +163,31 @@ function assembleboundarymatrix(mesh, active_vertices, kconstant)
     return S
 end
 
+#-----------------------------------------------------------------------------------
 
-kconstant = 2.0*pi/4000
+kconstant = 2.0*pi/2
 
 #assembly of the internal matrix
 S_int = assemblematrix(sea, interior_vertices, kconstant)
 
-#assembly of the boundary matrix (border vertices)
+#assembly of the boundary matrix (we map the border vertices to the active ones)
 S_bound = assembleboundarymatrix(border, interior_vertices, kconstant )
 
-print(size(S_int))
-print(size(S_bound))
-
-S = S_int + S_bound #global matrix
+#global matrix
+S = S_int + S_bound 
 
 
 #assembly of the element vector
 function f(x) #gaussian function
-    f = exp(-0.5*((x[1]+0.75)^2-(x[2]+0.0)^2))
+    f = exp(-0.5*( (x[1]-10)^2 + (x[2]+0.0)^2 ))
 end
 
 F = assemblevector(f, sea, interior_vertices)
 
-#solvin the linear system of equation S·c=b
+#solving the linear system of equation S·c=b
 u = S \ F
+
+#representing
 u_tilda = zeros(ComplexF64,length(sea_vertices))
 
 for (j,m) in enumerate(interior_vertices)
@@ -196,4 +195,4 @@ for (j,m) in enumerate(interior_vertices)
 end
 
 using WGLMakie
-WGLMakie.mesh(vertexarray(sea), cellarray(sea), color=u_tilda)
+WGLMakie.mesh(vertexarray(sea), cellarray(sea), color=real(u_tilda))
