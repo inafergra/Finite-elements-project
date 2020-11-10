@@ -41,6 +41,7 @@ elements and from 1 to 2 for segments. The function returns an index `i` into
 `active_vertices` if the i-th active vertex equals the p-th vertex of element k and
 `gl` return `nothing` otherwise.
 """
+
 function localtoglobal(active_vertices, domain)
     conn = copy(transpose(connectivity(active_vertices, domain, abs)))
     nz = nonzeros(conn)
@@ -72,7 +73,7 @@ function elementmatrix(mesh, element, kconstant)
     S = area *( [
         dot(grad1,grad1) dot(grad1,grad2) dot(grad1,grad3)
         dot(grad2,grad1) dot(grad2,grad2) dot(grad2,grad3)
-        dot(grad3,grad1) dot(grad3,grad2) dot(grad3,grad3)] - (Matrix(I, 3,3) + ones(3,3)) * kconstant * kconstant / 3)
+        dot(grad3,grad1) dot(grad3,grad2) dot(grad3,grad3)] - (Matrix(I, 3,3) + ones(3,3)) * kconstant^2 / 3)
 
     return S
 end
@@ -101,10 +102,8 @@ end
 function boundaryelementmatrix(mesh, element, kconstant) #defined in \Gamma_{2}=edge of the world #mesh should be border vertices
     v1 = mesh.vertices[element[1]]
     v2 = mesh.vertices[element[2]]
-    len = norm(v1-v2)
-    k = 3 * pi
-    S = len * im * k * complex(Matrix(I, 2,2) + ones(2,2)) /6
-
+    el_size = norm(v1-v2)
+    S = el_size * 1im * kconstant * complex(Matrix(I, 2,2) + ones(2,2)) /6
     return S
 end
 
