@@ -21,8 +21,8 @@ sea_vertices    = skeleton(sea, 0)
 #When solving the equation div(grad(u))-k^2*u=f the active vertices (i.e., the vertices with basis functions associated) only exclude the vertices in the coast line(\Gamma_{1}); border vertices do have basis functions attached
 
 active_vertices = submesh(sea_vertices) do v 
-    v in border_vertices && return false
-    #v in coast_vertices && return false 
+    #v in border_vertices && return false   
+    v in coast_vertices && return false #we exclude the coast vertices
     return true
 end
 
@@ -69,14 +69,11 @@ function elementmatrix(mesh, element, kconstant)
     grad1 = (normal × tangent1) / (2 *area)
     grad2 = (normal × tangent2) / (2 *area)
     grad3 = (normal × tangent3) / (2 *area)
-    S = area * [
+    S = area *( [
         dot(grad1,grad1) dot(grad1,grad2) dot(grad1,grad3)
         dot(grad2,grad1) dot(grad2,grad2) dot(grad2,grad3)
-        dot(grad3,grad1) dot(grad3,grad2) dot(grad3,grad3)]
-        -(area*kconstant^2)/3 * [
-        2 1 1 
-        1 2 1
-        1 1 2]
+        dot(grad3,grad1) dot(grad3,grad2) dot(grad3,grad3)] - (Matrix(I, 3,3) + ones(3,3)) * kconstant * kconstant / 3)
+
     return S
 end
 function assemblematrix(mesh, active_vertices, kconstant)
@@ -104,11 +101,10 @@ end
 function boundaryelementmatrix(mesh, element, kconstant) #defined in \Gamma_{2}=edge of the world #mesh should be border vertices
     v1 = mesh.vertices[element[1]]
     v2 = mesh.vertices[element[2]]
-    el_size= norm(v1-v2)
-    S = 1im*el_size*kconstant* [
-        2 1 1 
-        1 2 1
-        1 1 2] /6
+    len = norm(v1-v2)
+    k = 3 * pi
+    S = len * im * k * complex(Matrix(I, 2,2) + ones(2,2)) /6
+
     return S
 end
 
@@ -165,7 +161,7 @@ end
 
 #-----------------------------------------------------------------------------------
 
-kconstant = 50
+kconstant = 2.0*pi
 
 #assembly of the internal matrix
 S_int = assemblematrix(sea, active_vertices, kconstant)
@@ -176,12 +172,10 @@ S_bound = assembleboundarymatrix(border, active_vertices, kconstant )
 #global matrix
 S = S_int + S_bound
 
-
 #assembly of the element vector
 function f(x) #gaussian function
-    f = exp(-100.0*( (x[1]-0.75)^2 + (x[2])^2 ))
+    f = exp(-10.0*(x[1]-0.75)^2) * exp(-100.0*(x[2])^2 )
 end
-
 
 b = assemblevector(f, sea, active_vertices)
 
