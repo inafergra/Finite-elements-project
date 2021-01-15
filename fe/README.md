@@ -1,1 +1,1 @@
-Tsunami simulation through a finite elements approach
+The goal of this project was to simulate a tsunami-like phenomenon in the surface of the Earth through a numeric Finite Elements approach. Different boundary conditions and meshes were considered. For a detailed description of the project please read the report.
